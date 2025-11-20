@@ -42,6 +42,9 @@ const app = express();
 const uploadsDir = path.join(__dirname, '../public/uploads');
 const defaultDir = path.join(__dirname, '../public/default');
 
+const defaultImageSrc = path.join(__dirname, 'default/SinFoto.png'); 
+const defaultImageDest = path.join(defaultDir, 'SinFoto.png');
+
 try {
     if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
@@ -50,6 +53,10 @@ try {
     if (!fs.existsSync(defaultDir)) {
         fs.mkdirSync(defaultDir, { recursive: true });
         console.log('📁 Carpeta default creada');
+    }
+    if (!fs.existsSync(defaultImageDest)) {
+        fs.copyFileSync(defaultImageSrc, defaultImageDest);
+        console.log('Imagen por default copiada automáticamente');
     }
 } catch (error) {
     console.error('Error creando carpetas:', error);

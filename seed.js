@@ -1,4 +1,4 @@
-// seed.js
+// seed.js  BORRAR
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 
