@@ -101,8 +101,12 @@ app.get("/health", async (req, res) => {
 app.use("/", sesionRoutes);
 
 app.use("/", recetasRoutes);
-app.use('/uploads', express.static('public/uploads'));
-app.use('/default', express.static('public/default'));
+// Archivos subidos por usuarios
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+// Archivos por defecto
+app.use('/default', express.static(path.join(__dirname, 'public/default')));
+
 
 
 app.use("/", favoritasRoutes);
