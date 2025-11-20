@@ -33,7 +33,11 @@ dotenv.config(); // Cargar variables de entorno
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: '*',
+    methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json()); // para entender peticiones JSON
 
 // Conexiones a bases de datos 
