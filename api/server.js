@@ -102,7 +102,7 @@ app.use("/", sesionRoutes);
 
 app.use("/", recetasRoutes);
 app.use('/uploads', express.static('public/uploads'));
-app.use('/default', express.static(path.join(__dirname, '../public/default')));
+app.use('/default', express.static('public/default'));
 
 
 app.use("/", favoritasRoutes);
