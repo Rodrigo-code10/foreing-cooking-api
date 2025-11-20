@@ -5,11 +5,53 @@ import dotenv from "dotenv";
 import {connectMongo} from "./config/db.js";
 import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
+import fs from "fs"; 
+import path from "path";
+import { fileURLToPath } from 'url';
 
 import sesionRoutes from "./routes/sesionRoutes.js";
 import recetasRoutes from "./routes/recetasRoutes.js";
 import favoritasRoutes from "./routes/favoritasRoutes.js";
 import seguidoresRoutes from "./routes/seguidoresRoutes.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ✅ AGREGAR - Asegurar que la carpeta existe
+const uploadsPath = path.join(__dirname, "../../public/uploads");
+if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+    console.log('📁 Carpeta uploads creada desde routes');
+}
+
+// Configuración de multer para guardar fotos
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadsPath); 
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + "-" + file.originalname);
+    }
+});
+
+const upload = multer({ 
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, 
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        
+        if (mimetype && extname) {
+            return cb(null, true);
+        } else {
+            cb(new Error('Solo se permiten imágenes (jpeg, jpg, png, gif, webp)'));
+        }
+    }
+});
+
+
+
 
 const swaggerOptions = {
     definition: {
@@ -90,6 +132,27 @@ app.use("/", seguidoresRoutes);
 // Instancia de swagger
 const swaggerDocs = swaggerJSDoc(swaggerOptions);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+
+app.use((err, req, res, next) => {
+    console.error('Error global:', err);
+    
+    // Error de multer
+    if (err instanceof multer.MulterError) {
+        return res.status(400).json({
+            success: false,
+            error: 'Error al subir archivo',
+            detalle: err.message
+        });
+    }
+    
+    // Otros errores
+    res.status(500).json({
+        success: false,
+        error: 'Error del servidor',
+        detalle: err.message
+    });
+});
 
 
 // Inicio del servidor

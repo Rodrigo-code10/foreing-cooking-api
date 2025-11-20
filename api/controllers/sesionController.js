@@ -87,20 +87,56 @@ export async function iniciarSesion(req, res){
 export async function ModificarPerfil(req, res) {
     try {
         const { id, nombre, status } = req.body;
-        if (!id) return res.status(400).json({ success: false, error: "ID requerido" });
+        
+        if (!id) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "ID requerido" 
+            });
+        }
 
         const updateData = {};
-        if(nombre) updateData.nombre = nombre;
-        if(status) updateData.status = status;
-        if(req.file) updateData.foto = `/uploads/${req.file.filename}`;
+        if (nombre) updateData.nombre = nombre;
+        if (status) updateData.status = status;
+        
+        // Si hay archivo, guardar la ruta
+        if (req.file) {
+            updateData.foto = `/uploads/${req.file.filename}`;
+            console.log('Archivo guardado:', req.file.filename);
+        }
 
-        const modificaUsuario = await Usuario.findByIdAndUpdate(id, updateData, { new: true });
-        if(!modificaUsuario) return res.status(404).json({ success: false, error: "Usuario no encontrado" });
+        const modificaUsuario = await Usuario.findByIdAndUpdate(
+            id, 
+            updateData, 
+            { new: true }
+        );
+        
+        if (!modificaUsuario) {
+            return res.status(404).json({ 
+                success: false, 
+                error: "Usuario no encontrado" 
+            });
+        }
 
-        res.status(200).json({ success: true, usuario: modificaUsuario });
+        res.status(200).json({ 
+            success: true, 
+            mensaje: 'Perfil actualizado correctamente',
+            usuario: {
+                id: modificaUsuario._id,
+                nombre: modificaUsuario.nombre,
+                email: modificaUsuario.email,
+                foto: modificaUsuario.foto,
+                status: modificaUsuario.status
+            }
+        });
+        
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, error: 'Error al actualizar' });
+        console.error('Error en ModificarPerfil:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Error al actualizar perfil',
+            detalle: error.message
+        });
     }
 }
 
