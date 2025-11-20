@@ -39,8 +39,8 @@ dotenv.config(); // Cargar variables de entorno
 const app = express();
 
 // Crear carpetas necesarias
-const uploadsDir = path.join(__dirname, 'public/uploads');
-const defaultDir = path.join(__dirname, 'public/default');
+const uploadsDir = path.join(__dirname, '../public/uploads');
+const defaultDir = path.join(__dirname, '../public/default');
 
 try {
     if (!fs.existsSync(uploadsDir)) {
@@ -102,7 +102,7 @@ app.use("/", sesionRoutes);
 
 app.use("/", recetasRoutes);
 app.use('/uploads', express.static('public/uploads'));
-app.use('/default', express.static(defaultDir));
+app.use('/default', express.static('public/default'));
 
 
 app.use("/", favoritasRoutes);
