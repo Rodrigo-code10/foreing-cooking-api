@@ -17,42 +17,6 @@ import seguidoresRoutes from "./routes/seguidoresRoutes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ AGREGAR - Asegurar que la carpeta existe
-const uploadsPath = path.join(__dirname, "../../public/uploads");
-if (!fs.existsSync(uploadsPath)) {
-    fs.mkdirSync(uploadsPath, { recursive: true });
-    console.log('📁 Carpeta uploads creada desde routes');
-}
-
-// Configuración de multer para guardar fotos
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadsPath); 
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + "-" + file.originalname);
-    }
-});
-
-const upload = multer({ 
-    storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, 
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = /jpeg|jpg|png|/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = allowedTypes.test(file.mimetype);
-        
-        if (mimetype && extname) {
-            return cb(null, true);
-        } else {
-            cb(new Error('Solo se permiten imágenes (jpeg, jpg, png, gif, webp)'));
-        }
-    }
-});
-
-
-
-
 const swaggerOptions = {
     definition: {
         openapi: "3.0.0",
@@ -73,6 +37,23 @@ const swaggerOptions = {
 dotenv.config(); // Cargar variables de entorno
 
 const app = express();
+
+// Crear carpetas necesarias
+const uploadsDir = path.join(__dirname, '../public/uploads');
+const defaultDir = path.join(__dirname, '../public/default');
+
+try {
+    if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+        console.log('📁 Carpeta uploads creada');
+    }
+    if (!fs.existsSync(defaultDir)) {
+        fs.mkdirSync(defaultDir, { recursive: true });
+        console.log('📁 Carpeta default creada');
+    }
+} catch (error) {
+    console.error('Error creando carpetas:', error);
+}
 
 // Middleware
 app.use(cors({
@@ -135,18 +116,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 
 app.use((err, req, res, next) => {
-    console.error('Error global:', err);
-    
-    // Error de multer
-    if (err instanceof multer.MulterError) {
-        return res.status(400).json({
-            success: false,
-            error: 'Error al subir archivo',
-            detalle: err.message
-        });
-    }
-    
-    // Otros errores
+    console.error('Error:', err);
     res.status(500).json({
         success: false,
         error: 'Error del servidor',
