@@ -1,5 +1,6 @@
 import express from 'express';
 import multer from "multer";
+import cloudinary from "../config/cloudinary.js";
 import {
     registrarUsuario,
     iniciarSesion,
@@ -14,17 +15,19 @@ import {
     soloAdmin,
 } from '../middleware/auth.js'; 
 
-// Configuración de multer para guardar fotos
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, "public/uploads/");
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + "-" + file.originalname);
-    }
-});
-
-const upload = multer({ storage });
+const subirImagenCloudinary = (fileBuffer) => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder: "usuarios" },
+            (error, result) => {
+                if (result) resolve(result.secure_url);
+                else reject(error);
+            }
+        );
+        streamifier.createReadStream(fileBuffer).pipe(stream);
+    });
+};
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
@@ -34,7 +37,21 @@ router.post('/login', iniciarSesion);
 // Ruta para registrar un nuevo usuario
 router.post('/registrar', registrarUsuario); 
 
-router.put('/editarperfil', verificarToken,upload.single("foto"), ModificarPerfil);
+router.put('/editarperfil', verificarToken, upload.single("foto"), async (req, res) => {
+    try {
+        let urlFoto;
+        if (req.file) {
+            urlFoto = await subirImagenCloudinary(req.file.buffer);
+        }
+
+        // Pasamos la URL de la foto a la función del controlador
+        await ModificarPerfil(req, res, urlFoto);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Error subiendo la imagen" });
+    }
+});
 
 router.get('/BuscarUsuario',verificarToken, BuscarUsuario);
 

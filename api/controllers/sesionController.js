@@ -89,7 +89,7 @@ export async function iniciarSesion(req, res){
 }
 
 //Modifica Perfil
-export async function ModificarPerfil(req, res) {
+export async function ModificarPerfil(req, res,urlFoto) {
     try {
         const { id, nombre, status } = req.body;
         if (!id) return res.status(400).json({ success: false, error: "ID requerido" });
@@ -97,7 +97,7 @@ export async function ModificarPerfil(req, res) {
         const updateData = {};
         if(nombre) updateData.nombre = nombre;
         if(status) updateData.status = status;
-        if(req.file) updateData.foto = `/uploads/${req.file.filename}`;
+        if(urlFoto) updateData.foto = urlFoto;
 
         const modificaUsuario = await Usuario.findByIdAndUpdate(id, updateData, { new: true });
         if(!modificaUsuario) return res.status(404).json({ success: false, error: "Usuario no encontrado" });
