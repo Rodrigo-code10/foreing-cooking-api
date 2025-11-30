@@ -7,7 +7,8 @@ const usuarioSchema = new mongoose.Schema({
   rol: { type: String, enum: ["usuario", "admin"], default: "usuario" },
   foto:{ type:String, default: "/default/SinFoto.png"},
   status: { type:String },
-  fechaRegistro: { type: Date, default: Date.now }
+  fechaRegistro: { type: Date, default: Date.now },
+  estado: { type: String, enum: ['active', 'desactive'], default: 'active' }
 });
 
 export const Usuario = mongoose.model("Usuario", usuarioSchema);

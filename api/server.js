@@ -5,17 +5,11 @@ import dotenv from "dotenv";
 import {connectMongo} from "./config/db.js";
 import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
-import fs from "fs"; 
-import path from "path";
-import { fileURLToPath } from 'url';
 
 import sesionRoutes from "./routes/sesionRoutes.js";
 import recetasRoutes from "./routes/recetasRoutes.js";
 import favoritasRoutes from "./routes/favoritasRoutes.js";
-import seguidoresRoutes from "./routes/seguidoresRoutes.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const swaggerOptions = {
     definition: {
@@ -38,29 +32,8 @@ dotenv.config(); // Cargar variables de entorno
 
 const app = express();
 
-// Crear carpetas necesarias
-const uploadsDir = path.join(__dirname, '../public/uploads');
-const defaultDir = path.join(__dirname, '../public/default');
-
-try {
-    if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-        console.log('📁 Carpeta uploads creada');
-    }
-    if (!fs.existsSync(defaultDir)) {
-        fs.mkdirSync(defaultDir, { recursive: true });
-        console.log('📁 Carpeta default creada');
-    }
-} catch (error) {
-    console.error('Error creando carpetas:', error);
-}
-
 // Middleware
-app.use(cors({
-    origin: '*',
-    methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors());
 app.use(express.json()); // para entender peticiones JSON
 
 // Conexiones a bases de datos 
@@ -104,26 +77,12 @@ app.use("/", recetasRoutes);
 app.use('/uploads', express.static('public/uploads'));
 app.use('/default', express.static('public/default'));
 
-
 app.use("/", favoritasRoutes);
-
-app.use("/", seguidoresRoutes);
-
 
  
 // Instancia de swagger
 const swaggerDocs = swaggerJSDoc(swaggerOptions);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
-
-
-app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    res.status(500).json({
-        success: false,
-        error: 'Error del servidor',
-        detalle: err.message
-    });
-});
 
 
 // Inicio del servidor

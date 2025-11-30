@@ -1,4 +1,4 @@
-import { Receta } from "../models/nuevaReceta.js";
+import { Receta, parseIngrediente } from "../models/nuevaReceta.js";
 import { Usuario } from "../models/usuario.js";
 import { Favorito } from "../models/favoritos.js";
 import { Calificacion } from "../models/calificacion.js";
@@ -13,15 +13,27 @@ export async function crearReceta(req,res) {
             return res.status(400).json({ error: 'Faltan campos requeridos' });
         }
 
-        const usuario = await Usuario.findById(req.usuarioId);
+        let ingredientesArray = [];
+        if (req.body.ingredientes) {
+          if (Array.isArray(req.body.ingredientes)) {
+            ingredientesArray = req.body.ingredientes;
+          } else {
+            ingredientesArray = req.body.ingredientes.split('\n');
+          }
+          ingredientesArray = ingredientesArray
+            .map(i => i.trim())
+            .filter(i => i.length > 0)
+            .map(parseIngrediente);
+        }
 
+        const usuario = await Usuario.findById(req.usuarioId);        
         const nuevaReceta = new Receta({
             nombre: req.body.nombre_receta,
             descripcion: req.body.descripcion,
             tiempoPreparacion: req.body.tiempo_preparacion, 
             porciones: req.body.porciones,
             dificultad: req.body.dificultad, 
-            ingredientes: req.body.ingredientes.split('\n'), 
+            ingredientes: ingredientesArray,
             pasos: req.body.pasos.split('\n'),
             imagen: req.file ? `/uploads/${req.file.filename}` : null,
             autor: req.usuarioId,
@@ -41,33 +53,15 @@ export async function crearReceta(req,res) {
 }
 
 
-export function verificarToken(req, res, next) {
-    const header = req.headers['authorization'];
 
-    if (!header) {
-        return res.status(401).json({ error: "Token no proporcionado" });
-    }
-
-    const [bearer, token] = header.split(" ");
-
-    if (bearer !== "Bearer" || !token) {
-        return res.status(401).json({ error: "Formato de token inválido" });
-    }
-
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.usuarioId = decoded.id;
-        next(); 
-    } catch (error) {
-        res.status(403).json({ error: "Token inválido o expirado" });
-    }
-}
 
 
 export async function mostrarRecetas(req, res) {
     try {
         // Obtenemos los filtros desde query params
         const filtros = {};
+
+        filtros.estado = "aprobada";
 
         if (req.query.autor) {
             filtros.autor = req.query.autor;
@@ -78,15 +72,49 @@ export async function mostrarRecetas(req, res) {
         }
 
         if (req.query.categoria) {
-            filtros.categoria = req.query.categoria;
+            const categorias = Array.isArray(req.query.categoria)
+                ? req.query.categoria
+                : req.query.categoria.split(',');
+            filtros.categoria = { $all: categorias};
         }
-        if (req.query.ingrediente) {
-            filtros.ingredientes = { $in: [req.query.ingrediente] }; 
+        
+        if (req.query.ingredientes) {
+            const ingredientes = Array.isArray(req.query.ingredientes)
+                ? req.query.ingredientes
+                : req.query.ingredientes.split(',');
+        
+            const regexIngredientes = ingredientes.map(ing => {
+                const base = ing.trim()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "");
+                return new RegExp(`^${base}(es|s)?$`, "i");
+            });
+        
+            filtros["ingredientes.nombre"] = { $all: regexIngredientes };
+        }
+        let orden = {};
+
+        switch (req.query.orden) {
+            case "viejas":
+                orden = { fechaCreacion: 1 }; //De las mas antiguas
+                break;
+            case "top":
+                orden = { calificacion: -1 }; //Mejores Calificacion
+                break;
+            default:
+                orden = { fechaCreacion: -1 }; //Recientes
         }
 
-        const recetas = await Receta.find(filtros)
-            .populate('autor', 'nombre');
+        let query = Receta.find(filtros).populate('autor', 'nombre').sort(orden);
 
+        if (req.query.limit) {
+            const limit = parseInt(req.query.limit);
+            if (!isNaN(limit) && limit > 0) { //Verifia sino muestra todas 
+                query = query.limit(limit);
+            }
+        }
+
+        const recetas = await query;
         res.json(recetas);
     } catch (error) {
         console.error(error);
@@ -171,8 +199,6 @@ export const obtenerRecetaPorId = async (req, res) => {
         res.status(500).json({ error: 'Error del servidor al obtener receta' });
     }
 };
-
-
 
 // Calificar una receta
 export async function calificarReceta(req, res) {
@@ -259,5 +285,108 @@ export async function obtenerMiCalificacion(req, res) {
     } catch (error) {
         console.error('Error al obtener calificación:', error);
         res.status(500).json({ error: 'Error al obtener calificación' });
+    }
+}
+  
+export async function Aprobar(req, res){
+    try {
+      const receta = await Receta.findByIdAndUpdate(
+        req.params.id,
+        { estado: 'aprobada' },
+        { new: true }   //Devuleve el documento nuevo
+      );
+      res.json(receta);
+    } catch (err) {
+      res.status(500).json({ error: 'Error al aprobar receta' });
+    }
+}
+
+export async function Rechazar(req, res){
+    try {
+        const receta = await Receta.findByIdAndUpdate(
+          req.params.id,
+          { estado: 'rechazada' },
+          { new: true }
+        );
+        res.json(receta);
+      } catch (err) {
+        res.status(500).json({ error: 'Error al rechazar receta' });
+      }
+}
+
+export async function Pendiente(req, res) {
+    try {
+      const recetas = await Receta.find({ estado: 'pendiente' }).populate('autor', ['nombre', 'email']);
+      res.json(recetas);
+    } catch (err) {
+      console.error("Error en Pendiente:", err);
+      res.status(500).json({ error: "Error obteniendo recetas pendientes" });
+    }
+}
+
+export async function ContarRecetas(req, res) {
+    try {
+        // Agrupo por estado
+        const porEstado = await Receta.aggregate([
+            {
+                $group: {
+                    _id: "$estado",
+                    total: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const total = await Receta.countDocuments(); //General
+        const respuesta = {
+            total,
+            pendiente: porEstado.find(x => x._id === "pendiente")?.total || 0,
+            aprobada: porEstado.find(x => x._id === "aprobada")?.total || 0,
+            rechazada: porEstado.find(x => x._id === "rechazada")?.total || 0,
+        };
+
+        res.json(respuesta);
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error contando las recetas" });
+    }
+}
+
+export async function Ver(req, res) {
+    try {
+      const receta = await Receta.findById(req.params.id).populate('autor', 'nombre');
+      if (!receta) return res.status(404).json({ error: "Receta no encontrada" });
+      res.json(receta);
+    } catch (err) {
+      res.status(500).json({ error: "Error obteniendo receta" });
+    }
+}
+
+export async function Editar(req, res) {
+  try {
+    const receta = await Receta.findByIdAndUpdate(
+      req.params.id,
+      req.body,      // body debe contener solo los campos que quieres editar
+      { new: true }  
+    );
+    if (!receta) return res.status(404).json({ error: "Receta no encontrada" });
+    res.json(receta);
+  } catch (err) {
+    res.status(500).json({ error: "Error editando receta" });
+  }
+}
+
+export async function ImagenRecetas(req, res) {
+    try {
+        const cantidad = Number(req.query.cantidad) || 10;
+
+        const recetas = await Receta.find({estado: "aprobada"}, "imagen")   
+            .sort({ fechaCreacion: -1 })                  
+            .limit(cantidad);                             
+
+        res.json(recetas);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener recetas" });
     }
 }
